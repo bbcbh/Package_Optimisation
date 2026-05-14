@@ -49,7 +49,7 @@ public abstract class Abstract_Optimisation {
 	// Parameter setting
 	protected final String[] param_to_opt;	
 	protected final double[][] param_boundaries;
-	protected final HashMap<String, String> cross_ref_sample_range;
+	protected final HashMap<String, String> cross_ref_map;
 	
 	
 	// Optimiser setting
@@ -67,7 +67,7 @@ public abstract class Abstract_Optimisation {
 	protected final File file_seed_file;	
 	protected final String[] seed_file_lines;
 	protected final String[] seed_file_header;
-	protected final String OPTDIR_FORMAT = "%s_%d";
+	public static final String OPTDIR_FORMAT = "%s_%d";
 		
 	// Default setting
 	protected long opt_rng_seed = 2251912207291119l;
@@ -91,7 +91,7 @@ public abstract class Abstract_Optimisation {
 		
 		param_to_opt = param_to_opt_str.split(",");
 		HashMap<String, double[]> default_sample_range = new HashMap<>();
-		cross_ref_sample_range = new HashMap<>();
+		cross_ref_map = new HashMap<>();
 
 		for (String param : param_to_opt) {
 			String ent = prop.getProperty(String.format("PROP_PARAM_SETTING_%s", param));
@@ -100,7 +100,7 @@ public abstract class Abstract_Optimisation {
 				String[] sp = ent.split(",");
 				default_sample_range.put(param, new double[] { Double.parseDouble(sp[0]), Double.parseDouble(sp[1]) });
 				if (sp.length > 2) {
-					cross_ref_sample_range.put(param, sp[2]);
+					cross_ref_map.put(param, sp[2]);
 				}
 			}
 		}
@@ -220,8 +220,8 @@ public abstract class Abstract_Optimisation {
 			}
 			// Adjust for cross reference
 			for (int i = 0; i < param_to_opt.length; i++) {
-				if (cross_ref_sample_range.containsKey(param_to_opt[i])) {
-					param_init[i] = param_init[i] / init_value.get(cross_ref_sample_range.get(param_to_opt[i]));
+				if (cross_ref_map.containsKey(param_to_opt[i])) {
+					param_init[i] = param_init[i] / init_value.get(cross_ref_map.get(param_to_opt[i]));
 				}
 			}
 			
