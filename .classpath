@@ -17,8 +17,6 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry combineaccessrules="false" kind="src" path="/Package_BaseModel"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/Package_ClusterModel"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/RNG"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>

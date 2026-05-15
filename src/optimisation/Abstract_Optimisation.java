@@ -2,9 +2,12 @@ package optimisation;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -30,57 +33,55 @@ import org.apache.commons.math3.optim.nonlinear.scalar.noderiv.PowellOptimizer;
 import org.apache.commons.math3.optim.nonlinear.scalar.noderiv.SimplexOptimizer;
 
 import random.MersenneTwisterRandomGenerator;
+import util.StaticMethods;
 
 public abstract class Abstract_Optimisation {
-	
-	
+
 //	  Optimizer Type 			Best Use Case 		Performance (Speed) 
 //	  CMAES 	Stochastic 		Global/Non-smooth 	Slower 
 //	  BOBYQA 	Quadratic Appx 	Smooth/Bounded 		Moderate/Fast
 //	  Simplex 	Direct Search 	Local/Non-smooth 	Moderate 
 //	  Powell 	Direct Search 	Local/Smooth 		Fast 
-	
-	
+
 	public static final int OPT_TYPE_SIMPLEX = 0;
 	public static final int OPT_TYPE_CMAES = 1;
 	public static final int OPT_TYPE_BOBYQA = 2;
-	public static final int OPT_TYPE_POWELL = 3;	
+	public static final int OPT_TYPE_POWELL = 3;
 
 	// Parameter setting
-	protected final String[] param_to_opt;	
+	protected final String[] param_to_opt;
 	protected final double[][] param_boundaries;
 	protected final HashMap<String, String> cross_ref_map;
-	
-	
+
 	// Optimiser setting
 	protected int optType = OPT_TYPE_SIMPLEX;
-	protected final int[] opt_time_range;	
-	protected final double[][] opt_setting;	
+	protected final int[] opt_time_range;
+	protected final double[][] opt_setting;
+	protected final String[] opt_outcome_csv;
 	protected double opt_rel_tol = 1e-5;
-	protected double opt_abs_tol = 1e-10;		
+	protected double opt_abs_tol = 1e-10;
 	protected MaxEval opt_maxVal = MaxEval.unlimited();
-	
-	
-	// File paths	
+
+	// File paths
 	protected final String path_dirName;
-	protected final String path_seed_dir;
-	protected final File file_seed_file;	
+	protected final String path_seed;
+	protected final File file_seed_file;
 	protected final String[] seed_file_lines;
 	protected final String[] seed_file_header;
 	public static final String OPTDIR_FORMAT = "%s_%d";
-		
+
 	// Default setting
 	protected long opt_rng_seed = 2251912207291119l;
 	protected int opt_feasible_count = 10;
 	protected double opt_sigma_common = 0.1;
+
 	public static final String fileformat_output_txt = "Output.txt";
 	public static final String fileformat_point_cache = "OptProgress_PointCache_%s.csv";
 	public static final String fileformat_opt_outcomes = "OptProgress_ParamList_%s.csv";
-	
-	
-	public Abstract_Optimisation(String dirName, String seed_dir_name) throws IOException {
+
+	public Abstract_Optimisation(String dirName, String seed_name) throws IOException {
 		this.path_dirName = dirName;
-		this.path_seed_dir = seed_dir_name;
+		this.path_seed = seed_name;
 
 		File file_opt_setting = new File(dirName, "optSetting.prop");
 		FileInputStream fIS = new FileInputStream(file_opt_setting);
@@ -88,7 +89,7 @@ public abstract class Abstract_Optimisation {
 		prop.loadFromXML(fIS);
 		fIS.close();
 		String param_to_opt_str = prop.getProperty("PROP_PARAM_TO_OPT");
-		
+
 		param_to_opt = param_to_opt_str.split(",");
 		HashMap<String, double[]> default_sample_range = new HashMap<>();
 		cross_ref_map = new HashMap<>();
@@ -110,7 +111,7 @@ public abstract class Abstract_Optimisation {
 
 		opt_setting = (double[][]) util.PropValUtils.propStrToObject(prop.getProperty("PROP_OPT_SETTING"),
 				double[][].class);
-		
+
 		if (prop.containsKey("PPOP_OPT_TOLERANCE")) {
 			double[] opt_tol = (double[]) util.PropValUtils.propStrToObject(prop.getProperty("PPOP_OPT_TOLERANCE"),
 					double[].class);
@@ -131,36 +132,41 @@ public abstract class Abstract_Optimisation {
 		}
 
 		// Set up initial parameter array
-		file_seed_file = new File(new File(dirName, path_seed_dir), String.format("%s.csv", path_seed_dir));
-		seed_file_lines = util.Util_7Z_CSV_Entry_Extract_Callable.extracted_lines_from_text(file_seed_file);
+		File seed_file_test = new File(dirName, path_seed);
+		if (seed_file_test.isDirectory()) {
+			file_seed_file = new File(new File(dirName, path_seed), String.format("%s.csv", path_seed));
+		} else {
+			file_seed_file = seed_file_test;
+		}
+		seed_file_lines = util.StaticMethods.extracted_lines_from_text(file_seed_file);
 		seed_file_header = seed_file_lines[0].split(",");
-		
+
 		param_boundaries = new double[2][param_to_opt.length];
 		for (int i = 0; i < param_to_opt.length; i++) {
 			double[] range = default_sample_range.get(param_to_opt[i]);
 			param_boundaries[0][i] = range[0];
 			param_boundaries[1][i] = range[1];
 		}
-		
+
+		opt_outcome_csv = prop.getProperty("PROP_OPT_OUTCOME_CSV").replaceAll("\\s", "").split(",");
+
 	}
-		
-	protected abstract MultivariateFunction generateObjectiveFunc(int seed_row, String[] seed_file_def_val);	
-	
-	
+
+	protected abstract MultivariateFunction generateObjectiveFunc(int seed_row, String[] seed_file_def_val);
 
 	public void setOptType(int optType) {
 		this.optType = optType;
 	}
-	
+
 	public void runOptimisation() {
 
 		boolean hasReplacement = false;
 		for (int p = 1; p < seed_file_lines.length; p++) {
-			File preResult = new File(new File(path_dirName), String.format(Abstract_Optimisation.fileformat_opt_outcomes,
-					String.format(OPTDIR_FORMAT, path_seed_dir, p - 1)));
+			File preResult = new File(new File(path_dirName), String.format(
+					Abstract_Optimisation.fileformat_opt_outcomes, String.format(OPTDIR_FORMAT, path_seed, p - 1)));
 			if (preResult.exists()) {
 				try {
-					String[] pre_lines = util.Util_7Z_CSV_Entry_Extract_Callable.extracted_lines_from_text(preResult);
+					String[] pre_lines = util.StaticMethods.extracted_lines_from_text(preResult);
 					double minR = Double.POSITIVE_INFINITY;
 					for (int i = 1; i < pre_lines.length; i++) {
 						String[] pre_line_ent = pre_lines[i].split(",");
@@ -192,7 +198,7 @@ public abstract class Abstract_Optimisation {
 			try {
 				Files.copy(file_seed_file.toPath(),
 						new File(file_seed_file.getParent(), String.format("org_%s", file_seed_file.getName()))
-								.toPath());
+								.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
 				PrintWriter pWri_seed = new PrintWriter(file_seed_file);
 				for (int i = 0; i < seed_file_lines.length; i++) {
@@ -224,13 +230,13 @@ public abstract class Abstract_Optimisation {
 					param_init[i] = param_init[i] / init_value.get(cross_ref_map.get(param_to_opt[i]));
 				}
 			}
-			
-			// Objective function			
+
+			// Objective function
 			MultivariateFunction func = generateObjectiveFunc(seed_row, seed_file_def_val);
 
 			// Set up simplex
 
-			String wk_dir_name = String.format(OPTDIR_FORMAT, path_seed_dir, seed_row - 1);
+			String wk_dir_name = String.format(OPTDIR_FORMAT, path_seed, seed_row - 1);
 			MultivariateFunctionMappingAdapter wrapper = new MultivariateFunctionMappingAdapter(func,
 					param_boundaries[0], param_boundaries[1]);
 
@@ -248,7 +254,7 @@ public abstract class Abstract_Optimisation {
 					System.out.printf("%s : Optimisation start Max Eval = %d.\n", wk_dir_name, opt_maxVal.getMaxEval());
 
 					switch (optType) {
-					
+
 					case OPT_TYPE_SIMPLEX:
 						final NelderMeadSimplex simplex;
 
@@ -315,11 +321,9 @@ public abstract class Abstract_Optimisation {
 						try {
 							double[] sig_val = new double[param_to_opt.length];
 							Arrays.fill(sig_val, opt_sigma_common);
-							
-							SimpleBounds bounds = new SimpleBounds(										
-									wrapper.boundedToUnbounded(param_boundaries[0]),											
-									wrapper.boundedToUnbounded(param_boundaries[1]));			
-							
+
+							SimpleBounds bounds = new SimpleBounds(wrapper.boundedToUnbounded(param_boundaries[0]),
+									wrapper.boundedToUnbounded(param_boundaries[1]));
 
 							pV = optimizer.optimize(opt_maxVal, objFunc, GoalType.MINIMIZE, initial_guess,
 									new CMAESOptimizer.Sigma(sig_val), bounds, // Sigma and bound
@@ -337,7 +341,8 @@ public abstract class Abstract_Optimisation {
 							System.out.printf("%s :CMAES Optimisation Completed.\nP = [%s], V = %f\n", wk_dir_name,
 									pt_str.toString(), pV.getValue());
 						} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
-							System.out.printf("%s :CMAES Optimisation Eval limit of (ex.getMax=%d) reached\n",wk_dir_name, ex.getMax());
+							System.out.printf("%s :CMAES Optimisation Eval limit of (ex.getMax=%d) reached\n",
+									wk_dir_name, ex.getMax());
 						}
 
 						break;
@@ -347,10 +352,9 @@ public abstract class Abstract_Optimisation {
 						// Choices that exceed 2n+1 are not recommended.
 						int interpolationPoints = 2 * param_to_opt.length + 1;
 						optimizer = new BOBYQAOptimizer(interpolationPoints);
-						
-						SimpleBounds bounds = new SimpleBounds(										
-								wrapper.boundedToUnbounded(param_boundaries[0]),											
-								wrapper.boundedToUnbounded(param_boundaries[1]));						
+
+						SimpleBounds bounds = new SimpleBounds(wrapper.boundedToUnbounded(param_boundaries[0]),
+								wrapper.boundedToUnbounded(param_boundaries[1]));
 
 						try {
 							pV = optimizer.optimize(opt_maxVal, // Termination criteria: max evaluations
@@ -374,7 +378,8 @@ public abstract class Abstract_Optimisation {
 									wk_dir_name, pt_str.toString(), pV.getValue());
 
 						} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
-							System.out.printf("%s :BOBYQA Optimisation Eval limit of (ex.getMax=%d) reached\n",wk_dir_name, ex.getMax());
+							System.out.printf("%s :BOBYQA Optimisation Eval limit of (ex.getMax=%d) reached\n",
+									wk_dir_name, ex.getMax());
 						}
 
 						break;
@@ -402,7 +407,8 @@ public abstract class Abstract_Optimisation {
 									wk_dir_name, pt_str.toString(), pV.getValue());
 
 						} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
-							System.out.printf("%s :POWELL Optimisation Eval limit of (ex.getMax=%d) reached\n",wk_dir_name, ex.getMax());
+							System.out.printf("%s :POWELL Optimisation Eval limit of (ex.getMax=%d) reached\n",
+									wk_dir_name, ex.getMax());
 						}
 
 						break;
@@ -435,4 +441,29 @@ public abstract class Abstract_Optimisation {
 		}
 
 	}
+
+	protected static void generateResidueOutcomeFiles(File file_base_dir, String sim_id, String[] seed_header,
+			String[] seed_val_str, double[] point, double residue) throws FileNotFoundException, IOException {
+		File file_outcome = new File(file_base_dir, String.format(fileformat_opt_outcomes, sim_id));
+
+		PrintWriter pWri_outcome;
+		if (!file_outcome.exists()) {
+			pWri_outcome = new PrintWriter(file_outcome);
+			StaticMethods.writeEntries(pWri_outcome, seed_header);
+			pWri_outcome.println(",,RES");
+		} else {
+			pWri_outcome = new PrintWriter(new FileWriter(file_outcome, true));
+		}
+		StaticMethods.writeEntries(pWri_outcome, seed_val_str);
+		pWri_outcome.print(",,");
+		pWri_outcome.print(residue);
+		pWri_outcome.println();
+		pWri_outcome.close();
+
+		File file_pointCache = new File(file_base_dir, String.format(fileformat_point_cache, sim_id));
+		PrintWriter pWri_pointCache = new PrintWriter(new FileWriter(file_pointCache, true));
+		pWri_pointCache.printf("%s:%f\n", Arrays.toString(point), residue);
+		pWri_pointCache.close();
+	}
+
 }
