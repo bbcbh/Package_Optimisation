@@ -234,7 +234,7 @@ public abstract class Abstract_Optimisation {
 			// Objective function
 			MultivariateFunction func = generateObjectiveFunc(seed_row, seed_file_def_val);
 
-			// Set up simplex
+			// Set up optimiser
 
 			String wk_dir_name = String.format(OPTDIR_FORMAT, path_seed, seed_row - 1);
 			MultivariateFunctionMappingAdapter wrapper = new MultivariateFunctionMappingAdapter(func,
@@ -424,7 +424,7 @@ public abstract class Abstract_Optimisation {
 			if (seed_file_lines.length == 2) {
 				runnable_opt.run();
 			} else {
-				exec.execute(runnable_opt);
+				exec.submit(runnable_opt);
 			}
 
 		}
