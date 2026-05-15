@@ -198,7 +198,8 @@ public abstract class Abstract_Optimisation {
 			try {
 				Files.copy(file_seed_file.toPath(),
 						new File(file_seed_file.getParent(), String.format("org_%s", file_seed_file.getName()))
-								.toPath(), StandardCopyOption.REPLACE_EXISTING);
+								.toPath(),
+						StandardCopyOption.REPLACE_EXISTING);
 
 				PrintWriter pWri_seed = new PrintWriter(file_seed_file);
 				for (int i = 0; i < seed_file_lines.length; i++) {
@@ -245,53 +246,27 @@ public abstract class Abstract_Optimisation {
 			Runnable runnable_opt = new Runnable() {
 				@Override
 				public void run() {
-					InitialGuess initial_guess;
-					MultivariateOptimizer optimizer;
+					try {
+						InitialGuess initial_guess;
+						MultivariateOptimizer optimizer;
 
-					initial_guess = new InitialGuess(wrapper.boundedToUnbounded(param_init));
+						initial_guess = new InitialGuess(wrapper.boundedToUnbounded(param_init));
 
-					PointValuePair pV;
-					System.out.printf("%s : Optimisation start Max Eval = %d.\n", wk_dir_name, opt_maxVal.getMaxEval());
+						PointValuePair pV;
+						System.out.printf("%s : Optimisation start Max Eval = %d.\n", wk_dir_name,
+								opt_maxVal.getMaxEval());
 
-					switch (optType) {
+						switch (optType) {
 
-					case OPT_TYPE_SIMPLEX:
-						final NelderMeadSimplex simplex;
+						case OPT_TYPE_SIMPLEX:
+							final NelderMeadSimplex simplex;
 
-						simplex = new NelderMeadSimplex(param_init.length);
-						optimizer = new SimplexOptimizer(opt_rel_tol, opt_abs_tol);
+							simplex = new NelderMeadSimplex(param_init.length);
+							optimizer = new SimplexOptimizer(opt_rel_tol, opt_abs_tol);
 
-						try {
-							pV = optimizer.optimize(objFunc, simplex, GoalType.MINIMIZE, initial_guess, opt_maxVal);
-							double[] point = wrapper.unboundedToBounded(pV.getPoint());
-
-							StringBuilder pt_str = new StringBuilder();
-							for (double pt : point) {
-								if (pt_str.length() != 0) {
-									pt_str.append(',');
-								}
-								pt_str.append(String.format("%.5f", pt));
-							}
-
-							System.out.printf("%s :Simplex Optimisation Completed.\nP = [%s], V = %f\n", wk_dir_name,
-									pt_str.toString(), pV.getValue());
-
-						} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
-							System.out.printf(
-									"%s :Simplex Optimisation Eval limit of (ex.getMax=%d) reached.\nSimplex (bounded):\n",
-									wk_dir_name, ex.getMax());
-
-							PointValuePair[] res = simplex.getPoints();
-							Arrays.sort(res, new Comparator<PointValuePair>() {
-								@Override
-								public int compare(PointValuePair o1, PointValuePair o2) {
-									return Double.compare(o1.getValue(), o2.getValue());
-								}
-
-							});
-
-							for (PointValuePair pV_I : res) {
-								double[] point = wrapper.unboundedToBounded(pV_I.getPoint());
+							try {
+								pV = optimizer.optimize(objFunc, simplex, GoalType.MINIMIZE, initial_guess, opt_maxVal);
+								double[] point = wrapper.unboundedToBounded(pV.getPoint());
 
 								StringBuilder pt_str = new StringBuilder();
 								for (double pt : point) {
@@ -301,122 +276,153 @@ public abstract class Abstract_Optimisation {
 									pt_str.append(String.format("%.5f", pt));
 								}
 
-								System.out.printf("%s :P = [%s], V = %f\n", wk_dir_name, pt_str.toString(),
-										pV_I.getValue());
+								System.out.printf("%s :Simplex Optimisation Completed.\nP = [%s], V = %f\n",
+										wk_dir_name, pt_str.toString(), pV.getValue());
+
+							} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
+								System.out.printf(
+										"%s :Simplex Optimisation Eval limit of (ex.getMax=%d) reached.\nSimplex (bounded):\n",
+										wk_dir_name, ex.getMax());
+
+								PointValuePair[] res = simplex.getPoints();
+								Arrays.sort(res, new Comparator<PointValuePair>() {
+									@Override
+									public int compare(PointValuePair o1, PointValuePair o2) {
+										return Double.compare(o1.getValue(), o2.getValue());
+									}
+
+								});
+
+								for (PointValuePair pV_I : res) {
+									double[] point = wrapper.unboundedToBounded(pV_I.getPoint());
+
+									StringBuilder pt_str = new StringBuilder();
+									for (double pt : point) {
+										if (pt_str.length() != 0) {
+											pt_str.append(',');
+										}
+										pt_str.append(String.format("%.5f", pt));
+									}
+
+									System.out.printf("%s :P = [%s], V = %f\n", wk_dir_name, pt_str.toString(),
+											pV_I.getValue());
+
+								}
 
 							}
+							break;
+						case OPT_TYPE_CMAES:
+							optimizer = new CMAESOptimizer(opt_maxVal.getMaxEval(), // maxIterations
+									0.0, // stopFitness (threshold to stop)
+									true, // isActiveCMA
+									0, // diagonalOnly (iterations with diagonal covariance)
+									opt_feasible_count, // checkFeasableCount
+									new MersenneTwisterRandomGenerator(opt_rng_seed), // random generator
+									false, // generateStatistics
+									new SimpleValueChecker(opt_rel_tol, opt_abs_tol) // convergence checker
+							);
+							try {
+								double[] sig_val = new double[param_to_opt.length];
+								Arrays.fill(sig_val, opt_sigma_common);
 
-						}
-						break;
-					case OPT_TYPE_CMAES:
-						optimizer = new CMAESOptimizer(opt_maxVal.getMaxEval(), // maxIterations
-								0.0, // stopFitness (threshold to stop)
-								true, // isActiveCMA
-								0, // diagonalOnly (iterations with diagonal covariance)
-								opt_feasible_count, // checkFeasableCount
-								new MersenneTwisterRandomGenerator(opt_rng_seed), // random generator
-								false, // generateStatistics
-								new SimpleValueChecker(opt_rel_tol, opt_abs_tol) // convergence checker
-						);
-						try {
-							double[] sig_val = new double[param_to_opt.length];
-							Arrays.fill(sig_val, opt_sigma_common);
+								SimpleBounds bounds = new SimpleBounds(wrapper.boundedToUnbounded(param_boundaries[0]),
+										wrapper.boundedToUnbounded(param_boundaries[1]));
+
+								pV = optimizer.optimize(opt_maxVal, objFunc, GoalType.MINIMIZE, initial_guess,
+										new CMAESOptimizer.Sigma(sig_val), bounds, // Sigma and bound
+										new CMAESOptimizer.PopulationSize(opt_feasible_count));
+								double[] point = wrapper.unboundedToBounded(pV.getPoint());
+
+								StringBuilder pt_str = new StringBuilder();
+								for (double pt : point) {
+									if (pt_str.length() != 0) {
+										pt_str.append(',');
+									}
+									pt_str.append(String.format("%.5f", pt));
+								}
+
+								System.out.printf("%s :CMAES Optimisation Completed.\nP = [%s], V = %f\n", wk_dir_name,
+										pt_str.toString(), pV.getValue());
+							} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
+								System.out.printf("%s :CMAES Optimisation Eval limit of (ex.getMax=%d) reached\n",
+										wk_dir_name, ex.getMax());
+							}
+
+							break;
+						case OPT_TYPE_BOBYQA:
+							// For a problem of dimension n, its value must be in the interval [n+2,
+							// (n+1)(n+2)/2].
+							// Choices that exceed 2n+1 are not recommended.
+							int interpolationPoints = 2 * param_to_opt.length + 1;
+							optimizer = new BOBYQAOptimizer(interpolationPoints);
 
 							SimpleBounds bounds = new SimpleBounds(wrapper.boundedToUnbounded(param_boundaries[0]),
 									wrapper.boundedToUnbounded(param_boundaries[1]));
 
-							pV = optimizer.optimize(opt_maxVal, objFunc, GoalType.MINIMIZE, initial_guess,
-									new CMAESOptimizer.Sigma(sig_val), bounds, // Sigma and bound
-									new CMAESOptimizer.PopulationSize(opt_feasible_count));
-							double[] point = wrapper.unboundedToBounded(pV.getPoint());
+							try {
+								pV = optimizer.optimize(opt_maxVal, // Termination criteria: max evaluations
+										objFunc, // The function to minimize
+										GoalType.MINIMIZE, // Optimization goal
+										initial_guess, // Starting point
+										bounds // Required for BOBYQA
+								);
 
-							StringBuilder pt_str = new StringBuilder();
-							for (double pt : point) {
-								if (pt_str.length() != 0) {
-									pt_str.append(',');
+								double[] point = wrapper.unboundedToBounded(pV.getPoint());
+
+								StringBuilder pt_str = new StringBuilder();
+								for (double pt : point) {
+									if (pt_str.length() != 0) {
+										pt_str.append(',');
+									}
+									pt_str.append(String.format("%.5f", pt));
 								}
-								pt_str.append(String.format("%.5f", pt));
+
+								System.out.printf("%s :BOBYQA Optimisation Optimisation Completed.\nP = [%s], V = %f\n",
+										wk_dir_name, pt_str.toString(), pV.getValue());
+
+							} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
+								System.out.printf("%s :BOBYQA Optimisation Eval limit of (ex.getMax=%d) reached\n",
+										wk_dir_name, ex.getMax());
 							}
 
-							System.out.printf("%s :CMAES Optimisation Completed.\nP = [%s], V = %f\n", wk_dir_name,
-									pt_str.toString(), pV.getValue());
-						} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
-							System.out.printf("%s :CMAES Optimisation Eval limit of (ex.getMax=%d) reached\n",
-									wk_dir_name, ex.getMax());
-						}
+							break;
+						case OPT_TYPE_POWELL:
+							optimizer = new PowellOptimizer(opt_rel_tol, opt_abs_tol);
 
-						break;
-					case OPT_TYPE_BOBYQA:
-						// For a problem of dimension n, its value must be in the interval [n+2,
-						// (n+1)(n+2)/2].
-						// Choices that exceed 2n+1 are not recommended.
-						int interpolationPoints = 2 * param_to_opt.length + 1;
-						optimizer = new BOBYQAOptimizer(interpolationPoints);
+							try {
+								pV = optimizer.optimize(opt_maxVal, // Maximum evaluations
+										objFunc, // The function to optimize
+										GoalType.MINIMIZE, // Optimization goal
+										initial_guess // Starting point
+								);
 
-						SimpleBounds bounds = new SimpleBounds(wrapper.boundedToUnbounded(param_boundaries[0]),
-								wrapper.boundedToUnbounded(param_boundaries[1]));
+								double[] point = wrapper.unboundedToBounded(pV.getPoint());
 
-						try {
-							pV = optimizer.optimize(opt_maxVal, // Termination criteria: max evaluations
-									objFunc, // The function to minimize
-									GoalType.MINIMIZE, // Optimization goal
-									initial_guess, // Starting point
-									bounds // Required for BOBYQA
-							);
-
-							double[] point = wrapper.unboundedToBounded(pV.getPoint());
-
-							StringBuilder pt_str = new StringBuilder();
-							for (double pt : point) {
-								if (pt_str.length() != 0) {
-									pt_str.append(',');
+								StringBuilder pt_str = new StringBuilder();
+								for (double pt : point) {
+									if (pt_str.length() != 0) {
+										pt_str.append(',');
+									}
+									pt_str.append(String.format("%.5f", pt));
 								}
-								pt_str.append(String.format("%.5f", pt));
+
+								System.out.printf("%s :POWELL Optimisation Optimisation Completed.\nP = [%s], V = %f\n",
+										wk_dir_name, pt_str.toString(), pV.getValue());
+
+							} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
+								System.out.printf("%s :POWELL Optimisation Eval limit of (ex.getMax=%d) reached\n",
+										wk_dir_name, ex.getMax());
 							}
 
-							System.out.printf("%s :BOBYQA Optimisation Optimisation Completed.\nP = [%s], V = %f\n",
-									wk_dir_name, pt_str.toString(), pV.getValue());
+							break;
+						default:
+							System.err.printf("Error! Opt_Type = %d not defined/implemented. Exiting.\n", optType);
+							System.exit(-1);
 
-						} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
-							System.out.printf("%s :BOBYQA Optimisation Eval limit of (ex.getMax=%d) reached\n",
-									wk_dir_name, ex.getMax());
-						}
-
-						break;
-					case OPT_TYPE_POWELL:
-						optimizer = new PowellOptimizer(opt_rel_tol, opt_abs_tol);
-
-						try {
-							pV = optimizer.optimize(opt_maxVal, // Maximum evaluations
-									objFunc, // The function to optimize
-									GoalType.MINIMIZE, // Optimization goal
-									initial_guess // Starting point
-							);
-
-							double[] point = wrapper.unboundedToBounded(pV.getPoint());
-
-							StringBuilder pt_str = new StringBuilder();
-							for (double pt : point) {
-								if (pt_str.length() != 0) {
-									pt_str.append(',');
-								}
-								pt_str.append(String.format("%.5f", pt));
-							}
-
-							System.out.printf("%s :POWELL Optimisation Optimisation Completed.\nP = [%s], V = %f\n",
-									wk_dir_name, pt_str.toString(), pV.getValue());
-
-						} catch (org.apache.commons.math3.exception.TooManyEvaluationsException ex) {
-							System.out.printf("%s :POWELL Optimisation Eval limit of (ex.getMax=%d) reached\n",
-									wk_dir_name, ex.getMax());
-						}
-
-						break;
-					default:
-						System.err.printf("Error! Opt_Type = %d not defined/implemented. Exiting.\n", optType);
-						System.exit(-1);
-
-					} // End switch(optType) {...}
+						} // End switch(optType) {...}
+					} catch (Exception ex) {
+						ex.printStackTrace(System.err);
+					}
 
 				} // End run()
 			};
