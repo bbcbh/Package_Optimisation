@@ -68,7 +68,7 @@ public abstract class Abstract_Optimisation {
 	protected final File file_seed_file;
 	protected final String[] seed_file_lines;
 	protected final String[] seed_file_header;
-	public static final String OPTDIR_FORMAT = "%s_%d";
+	protected static final String OPTDIR_FORMAT = "%s_%d";
 
 	// Default setting
 	protected long opt_rng_seed = 2251912207291119l;
