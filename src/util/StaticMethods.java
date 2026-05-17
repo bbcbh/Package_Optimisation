@@ -52,34 +52,38 @@ public class StaticMethods {
 			String[] new_param_header, HashMap<String, double[]> default_param_range,
 			HashMap<String, String> cross_ref_map) throws FileNotFoundException, IOException {
 
-		String[] baseSeedLine = extracted_lines_from_text(baseSeedList);
-		String[] baseSeedHeader = baseSeedLine[0].split(",");
-		HashMap<String, ArrayList<Number>> map_val = new HashMap<>();
+		HashMap<String, ArrayList<Number>> map_val = new HashMap<>();	
+		int numExtracted  = 0;
 
-		for (int r = 1; r < baseSeedLine.length; r++) {
-			String[] rowEnt = baseSeedLine[r].split(",");
-			for (int c = 0; c < rowEnt.length; c++) {
-				String colName = baseSeedHeader[c];
-				if (!colName.isEmpty()) {
-					ArrayList<Number> ent = map_val.get(colName);
-					if (ent == null) {
-						ent = new ArrayList<>();
-						map_val.put(colName, ent);
-					}
-					if (colName.endsWith("SEED")) {
-						ent.add(Long.valueOf(rowEnt[c]));
-					} else {
-						try {
-							ent.add(Double.valueOf(rowEnt[c]));
-						} catch (NumberFormatException ex) {
-							ent.add(Double.NaN);
+		if (baseSeedList != null && baseSeedList.exists()) {
+			String[] baseSeedLine = extracted_lines_from_text(baseSeedList);
+			String[] baseSeedHeader = baseSeedLine[0].split(",");
+
+			for (int r = 1; r < baseSeedLine.length; r++) {
+				String[] rowEnt = baseSeedLine[r].split(",");
+				for (int c = 0; c < rowEnt.length; c++) {
+					String colName = baseSeedHeader[c];
+					if (!colName.isEmpty()) {
+						ArrayList<Number> ent = map_val.get(colName);
+						if (ent == null) {
+							ent = new ArrayList<>();
+							map_val.put(colName, ent);
+						}
+						if (colName.endsWith("SEED")) {
+							ent.add(Long.valueOf(rowEnt[c]));
+						} else {
+							try {
+								ent.add(Double.valueOf(rowEnt[c]));
+							} catch (NumberFormatException ex) {
+								ent.add(Double.NaN);
+							}
 						}
 					}
 				}
-			}
+			}			
+			numExtracted = baseSeedLine.length - 1;
+			System.out.printf("# seed from %s = %d\n", baseSeedList.getAbsolutePath(), numExtracted);
 		}
-
-		System.out.printf("# seed from %s = %d\n", baseSeedList.getAbsolutePath(), baseSeedLine.length - 1);
 
 		HashMap<String, UnivariateFunction> raw_val = new HashMap<>();
 		UnivariateInterpolator pol = new LinearInterpolator();
@@ -94,11 +98,13 @@ public class StaticMethods {
 			if (!colName.endsWith("SEED")) {
 				ArrayList<Number> ent = map_val.get(colName);
 				if (ent == null) {
+					if(numExtracted != 0) {
 					System.out.printf(
-							"Warning! Parameter %s not found from orginal list, attempt to sample from map_adjustment instead.\n",
+							" Parameter %s not found from original list, attempt to sample from default_param_range instead.\n",
 							colName);
+					}
 					if (!default_param_range.containsKey(colName)) {
-						System.out.printf("Error! Parameter %s not found in map_adjustment either. Exiting.\n",
+						System.out.printf("Error! Parameter %s not found in default_param_range. Exiting.\n",
 								colName);
 						System.exit(-1);
 					} else {
@@ -159,7 +165,7 @@ public class StaticMethods {
 				boolean[] directCopy = new boolean[new_param_header.length];
 				Arrays.fill(directCopy, false);
 
-				if (copied_entry < baseSeedLine.length - 1) {
+				if (copied_entry < numExtracted) {
 					// Copy entry
 					for (int p = 0; p < val.length; p++) {
 						String colName = new_param_header[p];
@@ -181,12 +187,10 @@ public class StaticMethods {
 							directCopy[p] = true;
 							ArrayList<Number> ent = map_val.get(colName);
 							val[p] = ent.get(RNG.nextInt(ent.size()));
-							
+
 						}
 					}
 				}
-				
-				
 
 				HashMap<String, Number> cross_ref_val = new HashMap<>();
 				for (int p = 0; p < val.length; p++) {
