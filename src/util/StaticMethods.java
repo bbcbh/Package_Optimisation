@@ -2,6 +2,7 @@ package util;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
@@ -10,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 
+import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
+import org.apache.commons.compress.archivers.sevenz.SevenZOutputFile;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.interpolation.UnivariateInterpolator;
@@ -240,6 +243,32 @@ public class StaticMethods {
 			pWri_seed.append(arr[i]);
 		}
 
+	}
+	
+	public static void zipFile(File[] FileList, File tarFile, boolean rmSource)
+			throws IOException, FileNotFoundException {
+		SevenZOutputFile outputZip = new SevenZOutputFile(tarFile);
+
+		SevenZArchiveEntry entry;
+		FileInputStream fIn;
+
+		for (int fI = 0; fI < FileList.length; fI++) {
+			entry = outputZip.createArchiveEntry(FileList[fI], FileList[fI].getName());
+			outputZip.putArchiveEntry(entry);
+			fIn = new FileInputStream(FileList[fI]);
+			outputZip.write(fIn);
+			outputZip.closeArchiveEntry();
+			fIn.close();
+		}
+
+		outputZip.close();
+
+		// Clean up
+		if (rmSource) {
+			for (File f : FileList) {
+				f.delete();
+			}
+		}
 	}
 
 }
