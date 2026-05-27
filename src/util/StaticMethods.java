@@ -7,11 +7,15 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
+import org.apache.commons.compress.archivers.sevenz.SevenZFile;
 import org.apache.commons.compress.archivers.sevenz.SevenZOutputFile;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
@@ -269,6 +273,52 @@ public class StaticMethods {
 				f.delete();
 			}
 		}
+	}
+	
+	public static HashMap<String, ArrayList<String[]>> extractedLinesFrom7Zip(File zipFile,
+			HashMap<String, ArrayList<String[]>> zip_ent, Pattern keyPattern) throws IOException {
+		SevenZFile inputZip = new SevenZFile(zipFile);
+		SevenZArchiveEntry inputEnt;
+		final int BUFFER = 2048;
+
+		byte[] buf = new byte[BUFFER];
+		while ((inputEnt = inputZip.getNextEntry()) != null) {
+			String file_name = inputEnt.getName();
+			StringBuilder str_builder = new StringBuilder();
+			String line;
+			ArrayList<String[]> lines = new ArrayList<>();
+			int count;
+			while ((count = inputZip.read(buf, 0, BUFFER)) != -1) {
+				str_builder.append(new String(Arrays.copyOf(buf, count)));
+			}
+			BufferedReader reader = new BufferedReader(new StringReader(str_builder.toString()));
+			while ((line = reader.readLine()) != null) {
+				if (line.length() > 0) {
+					lines.add(line.split(","));
+				}
+			}
+
+			String key = file_name;
+			if (keyPattern != null) {
+				Matcher m = keyPattern.matcher(file_name);
+				if (m.find()) {
+					if (m.groupCount() > 0) {
+						key = m.group(1);
+					} else {
+						System.err.print(
+								"extractedLinesFrom7Zip: Matcher has no group - using filename as key instead.\n");
+					}
+				} else {
+					// System.err.printf("extractedLinesFrom7Zip: File entries %s does not match
+					// with pattern "
+					// + "- using filename as key instead.\n", file_name);
+				}
+			}
+
+			zip_ent.put(key, lines);
+		}
+		inputZip.close();
+		return zip_ent;
 	}
 
 }
