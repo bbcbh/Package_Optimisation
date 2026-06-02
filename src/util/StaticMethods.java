@@ -59,8 +59,8 @@ public class StaticMethods {
 			String[] new_param_header, HashMap<String, double[]> default_param_range,
 			HashMap<String, String> cross_ref_map) throws FileNotFoundException, IOException {
 
-		HashMap<String, ArrayList<Number>> map_val = new HashMap<>();	
-		int numExtracted  = 0;
+		HashMap<String, ArrayList<Number>> map_val = new HashMap<>();
+		int numExtracted = 0;
 
 		if (baseSeedList != null && baseSeedList.exists()) {
 			String[] baseSeedLine = extracted_lines_from_text(baseSeedList);
@@ -87,7 +87,7 @@ public class StaticMethods {
 						}
 					}
 				}
-			}			
+			}
 			numExtracted = baseSeedLine.length - 1;
 			System.out.printf("# seed from %s = %d\n", baseSeedList.getAbsolutePath(), numExtracted);
 		}
@@ -105,14 +105,13 @@ public class StaticMethods {
 			if (!colName.endsWith("SEED")) {
 				ArrayList<Number> ent = map_val.get(colName);
 				if (ent == null) {
-					if(numExtracted != 0) {
-					System.out.printf(
-							" Parameter %s not found from original list, attempt to sample from default_param_range instead.\n",
-							colName);
+					if (numExtracted != 0) {
+						System.out.printf(
+								" Parameter %s not found from original list, attempt to sample from default_param_range instead.\n",
+								colName);
 					}
 					if (!default_param_range.containsKey(colName)) {
-						System.out.printf("Error! Parameter %s not found in default_param_range. Exiting.\n",
-								colName);
+						System.out.printf("Error! Parameter %s not found in default_param_range. Exiting.\n", colName);
 						System.exit(-1);
 					} else {
 						raw_val.put(colName,
@@ -248,7 +247,7 @@ public class StaticMethods {
 		}
 
 	}
-	
+
 	public static void zipFile(File[] FileList, File tarFile, boolean rmSource)
 			throws IOException, FileNotFoundException {
 		SevenZOutputFile outputZip = new SevenZOutputFile(tarFile);
@@ -274,7 +273,7 @@ public class StaticMethods {
 			}
 		}
 	}
-	
+
 	public static HashMap<String, ArrayList<String[]>> extractedLinesFrom7Zip(File zipFile,
 			HashMap<String, ArrayList<String[]>> zip_ent, Pattern keyPattern) throws IOException {
 		SevenZFile inputZip = new SevenZFile(zipFile);
@@ -293,8 +292,9 @@ public class StaticMethods {
 			}
 			BufferedReader reader = new BufferedReader(new StringReader(str_builder.toString()));
 			while ((line = reader.readLine()) != null) {
-				if (line.length() > 0) {
-					lines.add(line.split(","));
+				if (line.length() > 0) {					
+					String[] lineEnt = line.split(",");								
+					lines.add(lineEnt);					
 				}
 			}
 
