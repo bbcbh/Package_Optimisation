@@ -421,8 +421,8 @@ public abstract class Abstract_Optimisation {
 
 						} // End switch(optType) {...}
 					} catch (Exception ex) {						
-						System.err.printf("%s :Optimisation failed with initial value of:\nRaw:[%s]\nAdj:[%s]\n", wk_dir_name,								
-								seed_file_def_val, Arrays.toString(param_init));						
+						System.err.printf("%s :Optimisation failed with initial value of:\nRaw:%s\nAdj:%s\n", wk_dir_name,								
+								Arrays.toString(seed_file_def_val), Arrays.toString(param_init));						
 						
 						ex.printStackTrace(System.err);
 					}
