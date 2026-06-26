@@ -63,8 +63,8 @@ public abstract class Abstract_Optimisation {
 	protected MaxEval opt_maxVal = MaxEval.unlimited();
 
 	// File paths
-	protected final String path_dirName;
-	protected final String path_seed;
+	protected final String simDirPath;
+	protected final String seedDirName;
 	protected final File file_seed_file;
 	protected final String[] seed_file_lines;
 	protected final String[] seed_file_header;
@@ -80,8 +80,8 @@ public abstract class Abstract_Optimisation {
 	public static final String fileformat_opt_outcomes = "OptProgress_ParamList_%s.csv";
 
 	public Abstract_Optimisation(String dirName, String seed_name) throws IOException {
-		this.path_dirName = dirName;
-		this.path_seed = seed_name;
+		this.simDirPath = dirName;
+		this.seedDirName = seed_name;
 
 		File file_opt_setting = new File(dirName, "optSetting.prop");
 		FileInputStream fIS = new FileInputStream(file_opt_setting);
@@ -132,9 +132,9 @@ public abstract class Abstract_Optimisation {
 		}
 
 		// Set up initial parameter array
-		File seed_file_test = new File(dirName, path_seed);
+		File seed_file_test = new File(dirName, seedDirName);
 		if (seed_file_test.isDirectory()) {
-			file_seed_file = new File(new File(dirName, path_seed), String.format("%s.csv", path_seed));
+			file_seed_file = new File(new File(dirName, seedDirName), String.format("%s.csv", seedDirName));
 		} else {
 			file_seed_file = seed_file_test;
 		}
@@ -162,8 +162,8 @@ public abstract class Abstract_Optimisation {
 
 		boolean hasReplacement = false;
 		for (int p = 1; p < seed_file_lines.length; p++) {
-			File preResult = new File(new File(path_dirName), String.format(
-					Abstract_Optimisation.fileformat_opt_outcomes, String.format(OPTDIR_FORMAT, path_seed, p - 1)));
+			File preResult = new File(new File(simDirPath), String.format(
+					Abstract_Optimisation.fileformat_opt_outcomes, String.format(OPTDIR_FORMAT, seedDirName, p - 1)));
 			if (preResult.exists()) {
 				try {
 					String[] pre_lines = util.StaticMethods.extracted_lines_from_text(preResult);
@@ -237,7 +237,7 @@ public abstract class Abstract_Optimisation {
 
 			// Set up optimiser
 
-			String wk_dir_name = String.format(OPTDIR_FORMAT, path_seed, seed_row - 1);
+			String wk_dir_name = String.format(OPTDIR_FORMAT, seedDirName, seed_row - 1);
 			MultivariateFunctionMappingAdapter wrapper = new MultivariateFunctionMappingAdapter(func,
 					param_boundaries[0], param_boundaries[1]);
 
