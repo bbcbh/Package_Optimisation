@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -48,10 +49,12 @@ public abstract class Abstract_Optimisation {
 	public static final int OPT_TYPE_BOBYQA = 2;
 	public static final int OPT_TYPE_POWELL = 3;
 
-	// Parameter setting
+	// Parameter setting	
 	protected final String[] param_to_opt;
+	protected final String[] param_const;
 	protected final double[][] param_boundaries;
 	protected final HashMap<String, String> cross_ref_map;
+	protected final HashMap<String, double[]> param_all_sample_range;	
 
 	// Optimiser setting
 	protected int optType = OPT_TYPE_SIMPLEX;
@@ -90,21 +93,36 @@ public abstract class Abstract_Optimisation {
 		fIS.close();
 		String param_to_opt_str = prop.getProperty("PROP_PARAM_TO_OPT");
 
-		param_to_opt = param_to_opt_str.split(",");
-		HashMap<String, double[]> default_sample_range = new HashMap<>();
-		cross_ref_map = new HashMap<>();
+		String[] param_all = param_to_opt_str.split(",");	
+		
+		
+		ArrayList<String> param_to_opt_list = new ArrayList<>(param_all.length);
+		ArrayList<String> param_const_list = new ArrayList<>(param_all.length);
+		
+		param_all_sample_range = new HashMap<>();
+		cross_ref_map = new HashMap<>();				
 
-		for (String param : param_to_opt) {
+		for (int i = 0; i < param_all.length; i++) {
+			String param = param_all[i];			
 			String ent = prop.getProperty(String.format("PROP_PARAM_SETTING_%s", param));
 			if (ent != null) {
 				ent.replaceAll("\\s", "");
-				String[] sp = ent.split(",");
-				default_sample_range.put(param, new double[] { Double.parseDouble(sp[0]), Double.parseDouble(sp[1]) });
-				if (sp.length > 2) {
-					cross_ref_map.put(param, sp[2]);
+				String[] sp = ent.split(",");															
+				param_all_sample_range.put(param, new double[] { Double.parseDouble(sp[0]), Double.parseDouble(sp[1]) });
+				if (sp.length > 2) {																		
+					cross_ref_map.put(param, sp[2]);																			
+				}
+				// Check for non-constant parameter
+				if(!sp[0].equals(sp[1])) {
+					param_to_opt_list.add(param);
+				}else {
+					param_const_list.add(param);
 				}
 			}
 		}
+		
+		param_to_opt = param_to_opt_list.toArray(new String[0]);
+		param_const = param_const_list.toArray(new String[0]);		
 
 		opt_time_range = (int[]) util.PropValUtils.propStrToObject(prop.getProperty("PROP_OPT_TIME_RANGE"),
 				int[].class);
@@ -143,7 +161,7 @@ public abstract class Abstract_Optimisation {
 
 		param_boundaries = new double[2][param_to_opt.length];
 		for (int i = 0; i < param_to_opt.length; i++) {
-			double[] range = default_sample_range.get(param_to_opt[i]);
+			double[] range = param_all_sample_range.get(param_to_opt[i]);
 			param_boundaries[0][i] = range[0];
 			param_boundaries[1][i] = range[1];
 		}
